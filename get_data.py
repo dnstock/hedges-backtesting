@@ -9,12 +9,13 @@ import os
 import requests
 import pandas as pd
 import argparse
+from dotenv import load_dotenv
 
-# Ensure you set your API key in the environment variable POLYGON_API_KEY
-# API_KEY = os.getenv("POLYGON_API_KEY")
-# if not API_KEY:
-#     raise ValueError("Please set the POLYGON_API_KEY environment variable.")
-API_KEY = "1YBGQiinVCvPGpVHnlaUpSos8XBpMEJV"
+load_dotenv()
+
+API_KEY = os.getenv("POLYGON_API_KEY")
+if not API_KEY:
+    raise ValueError("Please set the POLYGON_API_KEY environment variable.")
 
 def fetch_stock_data(ticker, start_date, end_date, timespan="day", multiplier=1):
     """
