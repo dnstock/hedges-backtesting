@@ -122,18 +122,18 @@ exits = fast_ma < slow_ma
 # Backtest using vectorbt
 portfolio = vbt.Portfolio.from_signals(data, entries, exits, init_cash=10000, freq="1D")
 
-# Display portfolio performance metrics
+# Display portfolio performance metrics in an expandable section
 st.header("Portfolio Performance")
-stats_df = portfolio.stats()
-if isinstance(stats_df, pd.Series):
-    stats_df = stats_df.to_frame().T
-# Convert timedelta columns to strings to avoid serialization errors
-for col in stats_df.columns:
-    if pd.api.types.is_timedelta64_dtype(stats_df[col]):
-        stats_df[col] = stats_df[col].astype(str)
-st.write(stats_df)
+with st.expander("Show Metrics"):
+    stats_df = portfolio.stats()
+    if isinstance(stats_df, pd.Series):
+        stats_df = stats_df.to_frame().T
+    for col in stats_df.columns:
+        if pd.api.types.is_timedelta64_dtype(stats_df[col]):
+            stats_df[col] = stats_df[col].astype(str)
+    st.dataframe(stats_df)
 
-# Plot portfolio value over time using a manual plot
+# Plot portfolio value over time
 st.header("Portfolio Value")
 portfolio_value = portfolio.value() if callable(portfolio.value) else portfolio.value
 fig_value = go.Figure()
