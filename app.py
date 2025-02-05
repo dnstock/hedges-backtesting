@@ -4,6 +4,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import os
 
+# Set page configuration for a wider layout and custom title
+st.set_page_config(layout="wide", page_title="Hedges Backtesting Dashboard")
+
 st.title("Hedges Backtesting Dashboard")
 st.subheader("Test trading strategies against historical data", divider="rainbow")
 
@@ -65,33 +68,36 @@ exits = fast_ma < slow_ma
 # Backtest using vectorbt
 portfolio = vbt.Portfolio.from_signals(data, entries, exits, init_cash=10000, freq="1D")
 
-# Display portfolio performance metrics in an expandable section
-st.header("Portfolio Performance")
-with st.expander("Show Metrics"):
-    stats_df = portfolio.stats()
-    if isinstance(stats_df, pd.Series):
-        stats_df = stats_df.to_frame().T
-    for col in stats_df.columns:
-        if pd.api.types.is_timedelta64_dtype(stats_df[col]):
-            stats_df[col] = stats_df[col].astype(str)
-    st.dataframe(stats_df)
+# Instead of st.columns, use tabs for Performance and Value
+tabs_perf_value = st.tabs(["Performance", "Value"])
 
-# Plot portfolio value over time
-st.header("Portfolio Value")
-portfolio_value = portfolio.value() if callable(portfolio.value) else portfolio.value
-fig_value = go.Figure()
-fig_value.add_trace(go.Scatter(
-    x=portfolio_value.index,
-    y=portfolio_value,
-    mode="lines",
-    name="Portfolio Value"
-))
-fig_value.update_layout(
-    title="Portfolio Value Over Time",
-    xaxis_title="Date",
-    yaxis_title="Value"
-)
-st.plotly_chart(fig_value)
+with tabs_perf_value[0]:
+    st.header("Portfolio Performance")
+    with st.expander("Show Metrics"):
+        stats_df = portfolio.stats()
+        if isinstance(stats_df, pd.Series):
+            stats_df = stats_df.to_frame().T
+        for col in stats_df.columns:
+            if pd.api.types.is_timedelta64_dtype(stats_df[col]):
+                stats_df[col] = stats_df[col].astype(str)
+        st.dataframe(stats_df)
+
+with tabs_perf_value[1]:
+    st.header("Portfolio Value")
+    portfolio_value = portfolio.value() if callable(portfolio.value) else portfolio.value
+    fig_value = go.Figure()
+    fig_value.add_trace(go.Scatter(
+        x=portfolio_value.index,
+        y=portfolio_value,
+        mode="lines",
+        name="Portfolio Value"
+    ))
+    fig_value.update_layout(
+        title="Portfolio Value Over Time",
+        xaxis_title="Date",
+        yaxis_title="Value"
+    )
+    st.plotly_chart(fig_value)
 
 # Plot price along with moving averages for each ticker in separate tabs
 st.header("Price & Moving Averages")
@@ -105,60 +111,50 @@ for i, t in enumerate(selected_tickers):
         fig.update_layout(title=f"{t}: Price and Moving Averages", xaxis_title="Date", yaxis_title="Price")
         st.plotly_chart(fig)
 
-# Advanced Tools Section
-st.sidebar.subheader("Advanced Tools")
-advanced_enabled = st.sidebar.checkbox("Enable Advanced Analysis", value=False)
-if advanced_enabled:
-    # Use a single ticker for advanced analysis when multiple tickers are loaded.
-    if data.shape[1] > 1:
-        chosen_ticker = st.sidebar.selectbox("Select ticker for advanced analysis", options=data.columns)
+# New main area section for Advanced Metrics
+st.header("Advanced Metrics")
+# Automatically use the first selected ticker
+chosen_ticker = selected_tickers[0]
+price_series = data[chosen_ticker]
+adv_tabs_main = st.tabs(["Bollinger Bands", "Drawdowns"])
+
+with adv_tabs_main[0]:
+    # Compute and display Bollinger Bands (20-day SMA with 2 std dev)
+    sma = price_series.rolling(window=20).mean()
+    std = price_series.rolling(window=20).std()
+    upper = sma + 2 * std
+    lower = sma - 2 * std
+    fig_bb = go.Figure()
+    fig_bb.add_trace(go.Scatter(x=price_series.index, y=price_series, mode="lines", name=f"{chosen_ticker} Price"))
+    fig_bb.add_trace(go.Scatter(x=price_series.index, y=sma, mode="lines", name="SMA 20"))
+    fig_bb.add_trace(go.Scatter(x=price_series.index, y=upper, mode="lines", name="Upper Band"))
+    fig_bb.add_trace(go.Scatter(x=price_series.index, y=lower, mode="lines", name="Lower Band"))
+    fig_bb.update_layout(title=f"{chosen_ticker} Bollinger Bands", xaxis_title="Date", yaxis_title="Price")
+    st.plotly_chart(fig_bb)
+
+with adv_tabs_main[1]:
+    # Display drawdowns from the portfolio for the chosen ticker
+    dd = portfolio.drawdowns
+    dd_df = dd.records
+    st.subheader(f"{chosen_ticker} Drawdowns")
+    st.dataframe(dd_df)
+    drawdown_col = next((col for col in dd_df.columns if "drawdown" in col.lower()), None)
+    if drawdown_col is None:
+        st.error("No drawdown column found in the drawdowns data.")
     else:
-        chosen_ticker = data.columns[0]
-    advanced_bb = st.sidebar.checkbox("Show Bollinger Bands", value=True)
-    advanced_dd = st.sidebar.checkbox("Show Drawdowns Chart", value=True)
-
-    # Prepare the price series for the selected ticker.
-    price_series = data[chosen_ticker]
-
-    if advanced_bb:
-        # Compute Bollinger Bands (20-day SMA with 2 std dev)
-        sma = price_series.rolling(window=20).mean()
-        std = price_series.rolling(window=20).std()
-        upper = sma + 2 * std
-        lower = sma - 2 * std
-        fig_bb = go.Figure()
-        fig_bb.add_trace(go.Scatter(x=price_series.index, y=price_series, mode="lines", name=f"{chosen_ticker} Price"))
-        fig_bb.add_trace(go.Scatter(x=price_series.index, y=sma, mode="lines", name="SMA 20"))
-        fig_bb.add_trace(go.Scatter(x=price_series.index, y=upper, mode="lines", name="Upper Band"))
-        fig_bb.add_trace(go.Scatter(x=price_series.index, y=lower, mode="lines", name="Lower Band"))
-        fig_bb.update_layout(title=f"{chosen_ticker} Bollinger Bands", xaxis_title="Date", yaxis_title="Price")
-        st.plotly_chart(fig_bb)
-
-    if advanced_dd:
-        # Display drawdowns from the portfolio
-        dd = portfolio.drawdowns    # dd is a Drawdowns object
-        dd_df = dd.records         # Convert to DataFrame
-        st.subheader(f"{chosen_ticker} Drawdowns")
-        st.dataframe(dd_df)        # Display the full drawdowns table
-
-        # Identify the drawdown column (case-insensitive search for "drawdown")
-        drawdown_col = next((col for col in dd_df.columns if "drawdown" in col.lower()), None)
-        if drawdown_col is None:
-            st.error("No drawdown column found in the drawdowns data.")
-        else:
-            fig_dd = go.Figure()
-            fig_dd.add_trace(go.Bar(
-                x=dd_df.index,
-                y=dd_df[drawdown_col],
-                name="Drawdown"
-            ))
-            fig_dd.update_layout(title=f"{chosen_ticker} Drawdowns", xaxis_title="Index", yaxis_title=drawdown_col.title())
-            st.plotly_chart(fig_dd)
+        fig_dd = go.Figure()
+        fig_dd.add_trace(go.Bar(
+            x=dd_df.index,
+            y=dd_df[drawdown_col],
+            name="Drawdown"
+        ))
+        fig_dd.update_layout(title=f"{chosen_ticker} Drawdowns", xaxis_title="Index", yaxis_title=drawdown_col.title())
+        st.plotly_chart(fig_dd)
 
 # Option to show raw data
 if st.checkbox("Show Raw Data"):
-    st.subheader("Price Data")
-    st.dataframe(data)
+    with st.expander("Price Data"):
+        st.dataframe(data)
 
 st.sidebar.divider()
 
