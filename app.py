@@ -1,8 +1,8 @@
 import streamlit as st
 import vectorbt as vbt
-import yfinance as yf
 import pandas as pd
 import plotly.graph_objects as go
+import os
 
 st.title("Backtesting Dashboard for Trading Strategies")
 
@@ -81,10 +81,23 @@ if fast_window >= slow_window:
     st.sidebar.error("Fast MA window must be less than Slow MA window.")
     st.stop()
 
-# Download price data
-data = yf.download(ticker, start=start_date, end=end_date)["Close"]
+# Load price data from CSV files
+data_folder = "data"
+tickers = ticker.split()
+data = pd.DataFrame()
+
+for t in tickers:
+    file_path = os.path.join(data_folder, f"{t}.csv")
+    if os.path.exists(file_path):
+        df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+        df = df.loc[start_date:end_date]
+        data[t] = df["close"]
+    else:
+        st.error(f"No data found for ticker {t}. Please run get_data.py to fetch the data.")
+        st.stop()
+
 if data.empty:
-    st.error("No data found for ticker.")
+    st.error("No data found for the specified tickers and date range.")
     st.stop()
 
 # Compute moving averages
@@ -98,7 +111,6 @@ exits = fast_ma < slow_ma
 # Backtest using vectorbt
 portfolio = vbt.Portfolio.from_signals(data, entries, exits, init_cash=10000, freq="1D")
 
-# Display portfolio performance metrics
 # Display portfolio performance metrics
 st.header("Portfolio Performance")
 stats_df = portfolio.stats()
@@ -130,10 +142,11 @@ st.plotly_chart(fig_value)
 # Plot price along with moving averages
 st.header("Price & Moving Averages")
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=data.index, y=data, mode="lines", name="Price"))
-fig.add_trace(go.Scatter(x=fast_ma.index, y=fast_ma, mode="lines", name=f"Fast MA ({fast_window})"))
-fig.add_trace(go.Scatter(x=slow_ma.index, y=slow_ma, mode="lines", name=f"Slow MA ({slow_window})"))
-fig.update_layout(title=f"{ticker} Price and MAs", xaxis_title="Date", yaxis_title="Price")
+for t in tickers:
+    fig.add_trace(go.Scatter(x=data.index, y=data[t], mode="lines", name=f"{t} Price"))
+    fig.add_trace(go.Scatter(x=fast_ma.index, y=fast_ma[t], mode="lines", name=f"{t} Fast MA ({fast_window})"))
+    fig.add_trace(go.Scatter(x=slow_ma.index, y=slow_ma[t], mode="lines", name=f"{t} Slow MA ({slow_window})"))
+fig.update_layout(title="Price and MAs", xaxis_title="Date", yaxis_title="Price")
 st.plotly_chart(fig)
 
 # Option to show raw data
