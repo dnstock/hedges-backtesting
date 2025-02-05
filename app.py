@@ -6,11 +6,16 @@ import os
 
 st.title("Backtesting Dashboard for Trading Strategies")
 
-# Sidebar configuration
+# Get available tickers from data folder
+data_folder = "data"
+available_files = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
+available_tickers = [f.replace(".csv", "") for f in available_files]
+
 st.sidebar.header("Configuration")
-ticker = st.sidebar.text_input("Ticker(s)", placeholder="NVDA TSLA AAPL")
-start_date = st.sidebar.date_input("Start Date", value=pd.Timestamp("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", value=pd.Timestamp("2021-01-01"))
+# Multi-select from available tickers
+selected_tickers = st.sidebar.multiselect("Ticker(s)", options=available_tickers, default=["NVDA", "TSLA"])
+start_date = st.sidebar.date_input("Start Date", value=pd.Timestamp("2024-01-01"))
+end_date = st.sidebar.date_input("End Date", value=pd.Timestamp("2024-12-31"))
 fast_window = st.sidebar.slider("Fast MA Window", min_value=5, max_value=50, value=10)
 slow_window = st.sidebar.slider("Slow MA Window", min_value=10, max_value=200, value=50)
 
@@ -73,8 +78,8 @@ with st.sidebar.expander("To Summarize"):
 # """)
 
 # Validate input
-if not ticker:
-    st.info("Please enter at least one ticker symbol.")
+if not selected_tickers:
+    st.info("Please select at least one ticker.")
     st.stop()
 
 if fast_window >= slow_window:
