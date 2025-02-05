@@ -77,18 +77,6 @@ with st.sidebar.expander("To Summarize"):
     </span>
     """, unsafe_allow_html=True)
 
-# st.sidebar.markdown("""
-# **How These Windows Work:**
-
-# - **Fast MA Window:**
-#   The number of periods used for the fast moving average. Smaller values respond quickly to recent price changes, generating more signals (with the potential for increased noise and false signals).
-
-# - **Slow MA Window:**
-#   The number of periods used for the slow moving average. Larger values smooth out price fluctuations and reduce noise, but may delay signal generation.
-
-# Adjust these parameters to balance responsiveness and reliability.
-# """)
-
 # Validate input
 if not selected_tickers:
     st.info("Please select at least one ticker.")
@@ -165,4 +153,4 @@ for i, t in enumerate(selected_tickers):
 # Option to show raw data
 if st.checkbox("Show Raw Data"):
     st.subheader("Price Data")
-    st.write(data)
+    st.dataframe(data)
