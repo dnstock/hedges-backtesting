@@ -4,7 +4,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import os
 
-st.title("Backtesting Dashboard for Trading Strategies")
+st.title("Hedges Backtesting Dashboard")
+st.subheader("Test trading strategies against historical data", divider="rainbow")
 
 # Use caching while loading CSV data
 @st.cache_data
@@ -30,52 +31,6 @@ start_date = st.sidebar.date_input("Start Date", value=pd.Timestamp("2024-01-01"
 end_date = st.sidebar.date_input("End Date", value=pd.Timestamp("2024-12-31"))
 fast_window = st.sidebar.slider("Fast MA Window", min_value=5, max_value=50, value=10)
 slow_window = st.sidebar.slider("Slow MA Window", min_value=10, max_value=200, value=50)
-
-with st.sidebar.expander("Strategy Parameters"):
-    st.html("""
-    <div style="font-size:13px;">
-        <span style="font-weight:600;color:#333;">Fast MA Window:</span><br/>
-        <ul style="font-size:13px;margin-left:16px;">
-        <li>Uses fewer periods, so it reacts quickly to recent price changes.</li>
-        <li>A smaller window produces more signals (both true and false), which can lead to more trades but also more noise and potential whipsaws.</li>
-        </ul>
-        
-        <span style="font-weight:600;color:#333;">Slow MA Window:</span><br/>
-        <ul style="font-size:13px;margin-left:16px;margin-bottom:0;">
-        <li>Uses more periods, making it less sensitive and smoother.</li>
-        <li>A larger window reduces noise and false signals, but may delay entry and exit signals.</li>
-        </ul>
-    </div>
-    """)
-
-with st.sidebar.expander("Impact on Performance"):
-    st.markdown("""
-    <span style="font-size:13px;">
-    
-    **Smaller Fast MA / Larger Slow MA:**  
-    Can generate clear crossover signals but might lead to delayed exits or entries.
-
-    **Smaller Both:**  
-    May result in more frequent trading and increased transaction costs due to noise.
-
-    **Larger Both:**  
-    Results in fewer signals, potentially missing short-term opportunities but reducing whipsaws.
-    
-    </span>
-    """, unsafe_allow_html=True)
-
-with st.sidebar.expander("To Summarize"):
-    st.write("""
-    <span style="font-size:13px;">
-    
-    **Fast MA Window:** Determines how quickly the strategy responds to price changes.
-    
-    **Slow MA Window:** Affects the smoothness of the moving average and the lag in signal generation.
-
-    **In essence:** Adjusting these parameters changes how quickly the strategy responds to market moves, affecting trade frequency, potential profits, and overall risk. Testing different settings helps to balance sensitivity with reliability.
-    
-    </span>
-    """, unsafe_allow_html=True)
 
 # Validate input
 if not selected_tickers:
@@ -150,7 +105,105 @@ for i, t in enumerate(selected_tickers):
         fig.update_layout(title=f"{t}: Price and Moving Averages", xaxis_title="Date", yaxis_title="Price")
         st.plotly_chart(fig)
 
+# Advanced Tools Section
+st.sidebar.subheader("Advanced Tools")
+advanced_enabled = st.sidebar.checkbox("Enable Advanced Analysis", value=False)
+if advanced_enabled:
+    # Use a single ticker for advanced analysis when multiple tickers are loaded.
+    if data.shape[1] > 1:
+        chosen_ticker = st.sidebar.selectbox("Select ticker for advanced analysis", options=data.columns)
+    else:
+        chosen_ticker = data.columns[0]
+    advanced_bb = st.sidebar.checkbox("Show Bollinger Bands", value=True)
+    advanced_dd = st.sidebar.checkbox("Show Drawdowns Chart", value=True)
+
+    # Prepare the price series for the selected ticker.
+    price_series = data[chosen_ticker]
+
+    if advanced_bb:
+        # Compute Bollinger Bands (20-day SMA with 2 std dev)
+        sma = price_series.rolling(window=20).mean()
+        std = price_series.rolling(window=20).std()
+        upper = sma + 2 * std
+        lower = sma - 2 * std
+        fig_bb = go.Figure()
+        fig_bb.add_trace(go.Scatter(x=price_series.index, y=price_series, mode="lines", name=f"{chosen_ticker} Price"))
+        fig_bb.add_trace(go.Scatter(x=price_series.index, y=sma, mode="lines", name="SMA 20"))
+        fig_bb.add_trace(go.Scatter(x=price_series.index, y=upper, mode="lines", name="Upper Band"))
+        fig_bb.add_trace(go.Scatter(x=price_series.index, y=lower, mode="lines", name="Lower Band"))
+        fig_bb.update_layout(title=f"{chosen_ticker} Bollinger Bands", xaxis_title="Date", yaxis_title="Price")
+        st.plotly_chart(fig_bb)
+
+    if advanced_dd:
+        # Display drawdowns from the portfolio
+        dd = portfolio.drawdowns    # dd is a Drawdowns object
+        dd_df = dd.records         # Convert to DataFrame
+        st.subheader(f"{chosen_ticker} Drawdowns")
+        st.dataframe(dd_df)        # Display the full drawdowns table
+
+        # Identify the drawdown column (case-insensitive search for "drawdown")
+        drawdown_col = next((col for col in dd_df.columns if "drawdown" in col.lower()), None)
+        if drawdown_col is None:
+            st.error("No drawdown column found in the drawdowns data.")
+        else:
+            fig_dd = go.Figure()
+            fig_dd.add_trace(go.Bar(
+                x=dd_df.index,
+                y=dd_df[drawdown_col],
+                name="Drawdown"
+            ))
+            fig_dd.update_layout(title=f"{chosen_ticker} Drawdowns", xaxis_title="Index", yaxis_title=drawdown_col.title())
+            st.plotly_chart(fig_dd)
+
 # Option to show raw data
 if st.checkbox("Show Raw Data"):
     st.subheader("Price Data")
     st.dataframe(data)
+
+st.sidebar.divider()
+
+with st.sidebar.expander("Strategy Parameters"):
+    st.html("""
+    <div style="font-size:13px;">
+        <span style="font-weight:600;color:#333;">Fast MA Window:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Uses fewer periods, so it reacts quickly to recent price changes.</li>
+        <li>A smaller window produces more signals (both true and false), which can lead to more trades but also more noise and potential whipsaws.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">Slow MA Window:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;margin-bottom:0;">
+        <li>Uses more periods, making it less sensitive and smoother.</li>
+        <li>A larger window reduces noise and false signals, but may delay entry and exit signals.</li>
+        </ul>
+    </div>
+    """)
+
+with st.sidebar.expander("Impact on Performance"):
+    st.markdown("""
+    <span style="font-size:13px;">
+    
+    **Smaller Fast MA / Larger Slow MA:**  
+    Can generate clear crossover signals but might lead to delayed exits or entries.
+
+    **Smaller Both:**  
+    May result in more frequent trading and increased transaction costs due to noise.
+
+    **Larger Both:**  
+    Results in fewer signals, potentially missing short-term opportunities but reducing whipsaws.
+    
+    </span>
+    """, unsafe_allow_html=True)
+
+with st.sidebar.expander("To Summarize"):
+    st.write("""
+    <span style="font-size:13px;">
+    
+    **Fast MA Window:** Determines how quickly the strategy responds to price changes.
+    
+    **Slow MA Window:** Affects the smoothness of the moving average and the lag in signal generation.
+
+    **In essence:** Adjusting these parameters changes how quickly the strategy responds to market moves, affecting trade frequency, potential profits, and overall risk. Testing different settings helps to balance sensitivity with reliability.
+    
+    </span>
+    """, unsafe_allow_html=True)
