@@ -35,6 +35,27 @@ end_date = st.sidebar.date_input("End Date", value=pd.Timestamp("2024-12-31"))
 fast_window = st.sidebar.slider("Fast MA Window", min_value=5, max_value=50, value=10)
 slow_window = st.sidebar.slider("Slow MA Window", min_value=10, max_value=200, value=50)
 
+# CONFIGURATION HELP
+
+with st.sidebar.expander("Moving Average Parameters"):
+    st.html("""
+    <div style="font-size:13px;">
+        <span style="font-weight:600;color:#333;">Fast MA Window:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Number of days to compute the fast moving average.</li>
+        <li>Shorter windows can react faster to price changes but may lead to more false signals.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">Slow MA Window:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Number of days to compute the slow moving average.</li>
+        <li>Longer windows can smooth out price fluctuations but may lag behind the trend.</li>
+        </ul>
+    </div>
+    """)
+
+st.sidebar.divider()
+
 # Add ML strategy options
 st.sidebar.subheader("ML Strategy Options")
 ml_model = st.sidebar.selectbox(
@@ -45,6 +66,61 @@ ml_model = st.sidebar.selectbox(
 feature_window = st.sidebar.slider("Feature Window (days)", min_value=5, max_value=60, value=20)
 prediction_horizon = st.sidebar.slider("Prediction Horizon (days)", min_value=1, max_value=30, value=5)
 train_split = st.sidebar.slider("Training Split (%)", min_value=50, max_value=90, value=70)
+
+# ML STRATEGY HELP
+
+with st.sidebar.expander("ML Models"):
+    st.html("""
+    <div style="font-size:13px;">
+        <span style="font-weight:600;color:#333;">Linear Regression:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Simple linear model that fits a line to the data.</li>
+        <li>Interpretable but may underfit complex patterns.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">Random Forest:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Ensemble model that averages multiple decision trees.</li>
+        <li>Less interpretable but can capture complex patterns.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">XGBoost:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Gradient boosting model that optimizes a set of decision trees.</li>
+        <li>Highly accurate but may overfit with too many trees.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">Neural Network:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Deep learning model with multiple layers of neurons.</li>
+        <li>Highly flexible but requires large amounts of data and tuning.</li>
+        </ul>
+    </div>
+    """)
+
+with st.sidebar.expander("ML Strategy Parameters"):
+    st.html("""
+    <div style="font-size:13px;">
+        <span style="font-weight:600;color:#333;">Feature Window:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Number of lagged features to create for the model.</li>
+        <li>More features can capture more information but may lead to overfitting.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">Prediction Horizon:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Number of days ahead to predict the target price.</li>
+        <li>Shorter horizons may be more accurate but less profitable.</li>
+        </ul>
+        
+        <span style="font-weight:600;color:#333;">Training Split:</span><br/>
+        <ul style="font-size:13px;margin-left:16px;">
+        <li>Percentage of data to use for training the model.</li>
+        <li>More training data can improve model performance but may lead to overfitting.</li>
+        </ul>
+    </div>
+    """)
+
 
 # Validate input
 if not selected_tickers:
@@ -236,51 +312,3 @@ st.plotly_chart(fig_ml)
 if st.checkbox("Show Raw Data"):
     with st.expander("Price Data"):
         st.dataframe(data)
-
-st.sidebar.divider()
-
-with st.sidebar.expander("Strategy Parameters"):
-    st.html("""
-    <div style="font-size:13px;">
-        <span style="font-weight:600;color:#333;">Fast MA Window:</span><br/>
-        <ul style="font-size:13px;margin-left:16px;">
-        <li>Uses fewer periods, so it reacts quickly to recent price changes.</li>
-        <li>A smaller window produces more signals (both true and false), which can lead to more trades but also more noise and potential whipsaws.</li>
-        </ul>
-        
-        <span style="font-weight:600;color:#333;">Slow MA Window:</span><br/>
-        <ul style="font-size:13px;margin-left:16px;margin-bottom:0;">
-        <li>Uses more periods, making it less sensitive and smoother.</li>
-        <li>A larger window reduces noise and false signals, but may delay entry and exit signals.</li>
-        </ul>
-    </div>
-    """)
-
-with st.sidebar.expander("Impact on Performance"):
-    st.markdown("""
-    <span style="font-size:13px;">
-    
-    **Smaller Fast MA / Larger Slow MA:**  
-    Can generate clear crossover signals but might lead to delayed exits or entries.
-
-    **Smaller Both:**  
-    May result in more frequent trading and increased transaction costs due to noise.
-
-    **Larger Both:**  
-    Results in fewer signals, potentially missing short-term opportunities but reducing whipsaws.
-    
-    </span>
-    """, unsafe_allow_html=True)
-
-with st.sidebar.expander("To Summarize"):
-    st.write("""
-    <span style="font-size:13px;">
-    
-    **Fast MA Window:** Determines how quickly the strategy responds to price changes.
-    
-    **Slow MA Window:** Affects the smoothness of the moving average and the lag in signal generation.
-
-    **In essence:** Adjusting these parameters changes how quickly the strategy responds to market moves, affecting trade frequency, potential profits, and overall risk. Testing different settings helps to balance sensitivity with reliability.
-    
-    </span>
-    """, unsafe_allow_html=True)
