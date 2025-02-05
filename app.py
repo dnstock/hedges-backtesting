@@ -35,6 +35,17 @@ end_date = st.sidebar.date_input("End Date", value=pd.Timestamp("2024-12-31"))
 fast_window = st.sidebar.slider("Fast MA Window", min_value=5, max_value=50, value=10)
 slow_window = st.sidebar.slider("Slow MA Window", min_value=10, max_value=200, value=50)
 
+# Add ML strategy options
+st.sidebar.subheader("ML Strategy Options")
+ml_model = st.sidebar.selectbox(
+    "Select ML Model",
+    options=["Linear Regression", "Random Forest", "XGBoost", "Neural Network"],
+    index=0
+)
+feature_window = st.sidebar.slider("Feature Window (days)", min_value=5, max_value=60, value=20)
+prediction_horizon = st.sidebar.slider("Prediction Horizon (days)", min_value=1, max_value=30, value=5)
+train_split = st.sidebar.slider("Training Split (%)", min_value=50, max_value=90, value=70)
+
 # Validate input
 if not selected_tickers:
     st.info("Please select at least one ticker.")
@@ -150,6 +161,76 @@ with adv_tabs_main[1]:
         ))
         fig_dd.update_layout(title=f"{chosen_ticker} Drawdowns", xaxis_title="Index", yaxis_title=drawdown_col.title())
         st.plotly_chart(fig_dd)
+
+# New main area section for ML Strategy Results
+st.header("ML Strategy Results")
+st.write("Selected Model:", ml_model)
+
+import numpy as np
+# Use the price series of the first selected ticker for ML predictions.
+ml_series = data[selected_tickers[0]]
+
+# Create lag features as predictors
+lags = [ml_series.shift(i) for i in range(1, feature_window+1)]
+X = pd.concat(lags, axis=1)
+X.columns = [f"lag_{i}" for i in range(1, feature_window+1)]
+# Create target: price after prediction_horizon days
+y = ml_series.shift(-prediction_horizon)
+df_ml = pd.concat([X, y.rename("target")], axis=1).dropna()
+
+# Split data into training and testing sets
+train_size = int(len(df_ml) * (train_split / 100))
+train = df_ml.iloc[:train_size]
+test = df_ml.iloc[train_size:]
+X_train = train.drop("target", axis=1)
+y_train = train["target"]
+X_test = test.drop("target", axis=1)
+y_test = test["target"]
+
+# Instantiate the selected ML model
+if ml_model == "Linear Regression":
+    from sklearn.linear_model import LinearRegression
+    model = LinearRegression()
+elif ml_model == "Random Forest":
+    from sklearn.ensemble import RandomForestRegressor
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+elif ml_model == "XGBoost":
+    from xgboost import XGBRegressor
+    model = XGBRegressor(random_state=42)
+elif ml_model == "Neural Network":
+    from sklearn.neural_network import MLPRegressor
+    model = MLPRegressor(hidden_layer_sizes=(50, 50), max_iter=500, random_state=42)
+
+# Train the model and predict
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+# Compute RMSE as a performance metric
+from sklearn.metrics import mean_squared_error
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+st.write(f"RMSE: {rmse:.2f}")
+
+# Plot actual versus predicted prices
+fig_ml = go.Figure()
+fig_ml.add_trace(go.Scatter(
+    x=y_test.index,
+    y=y_test,
+    mode="lines",
+    name="Actual"
+))
+fig_ml.add_trace(go.Scatter(
+    x=y_test.index,
+    y=y_pred,
+    mode="lines",
+    name="Predicted"
+))
+fig_ml.update_layout(
+    title=f"{ml_model} Predictions (RMSE: {rmse:.2f})",
+    xaxis_title="Date",
+    yaxis_title="Price"
+)
+st.plotly_chart(fig_ml)
 
 # Option to show raw data
 if st.checkbox("Show Raw Data"):
