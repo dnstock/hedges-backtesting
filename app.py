@@ -6,6 +6,18 @@ import os
 
 st.title("Backtesting Dashboard for Trading Strategies")
 
+# Use caching while loading CSV data
+@st.cache_data
+def load_ticker_data(ticker, data_folder, start_date, end_date):
+    file_path = os.path.join(data_folder, f"{ticker}.csv")
+    try:
+        df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+        df = df.loc[start_date:end_date]
+        return df["close"]
+    except Exception as e:
+        st.error(f"Error loading data for {ticker}: {e}")
+        return pd.Series()
+
 # Get available tickers from data folder
 data_folder = "data"
 available_files = [f for f in os.listdir(data_folder) if f.endswith(".csv")]
@@ -86,20 +98,14 @@ if fast_window >= slow_window:
     st.sidebar.error("Fast MA window must be less than Slow MA window.")
     st.stop()
 
-# Load price data from CSV files
-data_folder = "data"
-tickers = ticker.split()
+# Load price data from CSV files using cached function
 data = pd.DataFrame()
-
-for t in tickers:
-    file_path = os.path.join(data_folder, f"{t}.csv")
-    if os.path.exists(file_path):
-        df = pd.read_csv(file_path, index_col=0, parse_dates=True)
-        df = df.loc[start_date:end_date]
-        data[t] = df["close"]
-    else:
+for t in selected_tickers:
+    series = load_ticker_data(t, data_folder, start_date, end_date)
+    if series.empty:
         st.error(f"No data found for ticker {t}. Please run get_data.py to fetch the data.")
         st.stop()
+    data[t] = series
 
 if data.empty:
     st.error("No data found for the specified tickers and date range.")
