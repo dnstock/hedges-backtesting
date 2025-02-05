@@ -150,15 +150,17 @@ fig_value.update_layout(
 )
 st.plotly_chart(fig_value)
 
-# Plot price along with moving averages
+# Plot price along with moving averages for each ticker in separate tabs
 st.header("Price & Moving Averages")
-fig = go.Figure()
-for t in tickers:
-    fig.add_trace(go.Scatter(x=data.index, y=data[t], mode="lines", name=f"{t} Price"))
-    fig.add_trace(go.Scatter(x=fast_ma.index, y=fast_ma[t], mode="lines", name=f"{t} Fast MA ({fast_window})"))
-    fig.add_trace(go.Scatter(x=slow_ma.index, y=slow_ma[t], mode="lines", name=f"{t} Slow MA ({slow_window})"))
-fig.update_layout(title="Price and MAs", xaxis_title="Date", yaxis_title="Price")
-st.plotly_chart(fig)
+tabs = st.tabs(selected_tickers)
+for i, t in enumerate(selected_tickers):
+    with tabs[i]:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=data.index, y=data[t], mode="lines", name=f"{t} Price"))
+        fig.add_trace(go.Scatter(x=fast_ma.index, y=fast_ma[t], mode="lines", name=f"Fast MA ({fast_window})"))
+        fig.add_trace(go.Scatter(x=slow_ma.index, y=slow_ma[t], mode="lines", name=f"Slow MA ({slow_window})"))
+        fig.update_layout(title=f"{t}: Price and Moving Averages", xaxis_title="Date", yaxis_title="Price")
+        st.plotly_chart(fig)
 
 # Option to show raw data
 if st.checkbox("Show Raw Data"):
