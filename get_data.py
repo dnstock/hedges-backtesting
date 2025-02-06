@@ -17,7 +17,7 @@ API_KEY = os.getenv("POLYGON_API_KEY")
 if not API_KEY:
     raise ValueError("Please set the POLYGON_API_KEY environment variable.")
 
-def fetch_stock_data(ticker, start_date, end_date, timespan="day", multiplier=1):
+def fetch_stock_data(ticker, start_date, end_date, timespan="minute", multiplier=1):
     """
     Fetches aggregated OHLCV data from Polygon.io for a given ticker and date range.
     Uses pagination if more than 50,000 records are returned.
@@ -29,20 +29,21 @@ def fetch_stock_data(ticker, start_date, end_date, timespan="day", multiplier=1)
     params = {"adjusted": "true", "sort": "asc", "limit": 50000, "apiKey": API_KEY}
     results = []
     url = base_url
-    while True:
-        resp = requests.get(url, params=params)
-        data = resp.json()
-        if "results" in data:
-            results.extend(data["results"])
-        else:
-            print(f"Error fetching data for {ticker}: {data}")
-            break
-        if data.get("next_url"):
-            # next_url already includes all parameters including apiKey.
-            url = data["next_url"]
-            params = {}  # clear params for subsequent requests
-        else:
-            break
+    with requests.Session() as session:
+        while True:
+            resp = session.get(url, params=params)
+            data = resp.json()
+            if "results" in data:
+                results.extend(data["results"])
+            else:
+                print(f"Error fetching data for {ticker}: {data}")
+                break
+            if data.get("next_url"):
+                # next_url already includes all parameters including apiKey.
+                url = data["next_url"]
+                params = {}  # clear params for subsequent requests
+            else:
+                break
 
     if results:
         df = pd.DataFrame(results)
@@ -55,19 +56,6 @@ def fetch_stock_data(ticker, start_date, end_date, timespan="day", multiplier=1)
         return df
     else:
         return pd.DataFrame()
-
-def load_data_for_vectorbt(data_folder):
-    """
-    Loads CSV files from the specified folder into a dictionary of DataFrames.
-    The dictionary keys are ticker symbols.
-    """
-    data = {}
-    for file in os.listdir(data_folder):
-        if file.endswith(".csv"):
-            ticker = file.replace(".csv", "")
-            df = pd.read_csv(os.path.join(data_folder, file), index_col=0, parse_dates=True)
-            data[ticker] = df
-    return data
 
 def main():
     parser = argparse.ArgumentParser(
@@ -85,6 +73,13 @@ def main():
     parser.add_argument(
         "--output", type=str, default="data", help="Output folder to store CSV files"
     )
+    # New arguments to optimize data retrieval for ML strategies
+    parser.add_argument(
+        "--timespan", type=str, default="minute", help="Data timespan (e.g., minute, hour, day)"
+    )
+    parser.add_argument(
+        "--multiplier", type=int, default=1, help="Multiplier for timespan aggregation"
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.output):
@@ -92,17 +87,13 @@ def main():
 
     for ticker in args.tickers:
         print(f"Fetching data for {ticker}...")
-        df = fetch_stock_data(ticker, args.start, args.end)
+        df = fetch_stock_data(ticker, args.start, args.end, args.timespan, args.multiplier)
         if df.empty:
             print(f"No data returned for {ticker}.")
             continue
         file_path = os.path.join(args.output, f"{ticker}.csv")
         df.to_csv(file_path)
         print(f"Saved data for {ticker} to {file_path}")
-
-    # Optionally, load data for vectorbt processing:
-    # data_dict = load_data_for_vectorbt(args.output)
-    # Now you can pass `data_dict` to vectorbt functions.
 
 if __name__ == "__main__":
     main()
