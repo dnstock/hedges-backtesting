@@ -17,7 +17,7 @@ API_KEY = os.getenv("POLYGON_API_KEY")
 if not API_KEY:
     raise ValueError("Please set the POLYGON_API_KEY environment variable.")
 
-def fetch_stock_data(ticker, start_date, end_date, timespan="minute", multiplier=1):
+def fetch_stock_data(ticker, start_date, end_date, timespan="minute", multiplier=1, limit=50000):
     """
     Fetches aggregated OHLCV data from Polygon.io for a given ticker and date range.
     Uses pagination if more than 50,000 records are returned.
@@ -26,7 +26,7 @@ def fetch_stock_data(ticker, start_date, end_date, timespan="minute", multiplier
         f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/"
         f"{multiplier}/{timespan}/{start_date}/{end_date}"
     )
-    params = {"adjusted": "true", "sort": "asc", "limit": 50000, "apiKey": API_KEY}
+    params = {"adjusted": "true", "sort": "asc", "limit": limit, "apiKey": API_KEY}
     results = []
     url = base_url
     with requests.Session() as session:
@@ -50,9 +50,15 @@ def fetch_stock_data(ticker, start_date, end_date, timespan="minute", multiplier
         # Convert the timestamp (in ms) to datetime and set as index
         df["date"] = pd.to_datetime(df["t"], unit="ms")
         df = df.set_index("date")
-        # Select and rename columns to match vectorbt's expectations
-        df = df[["o", "h", "l", "c", "v"]]
-        df.columns = ["open", "high", "low", "close", "volume"]
+        # Select and rename primary OHLCV columns
+        cols = {"o": "open", "h": "high", "l": "low", "c": "close", "v": "volume"}
+        # Include additional ML features if available
+        if "vw" in df.columns:
+            cols["vw"] = "vwap"
+        if "n" in df.columns:
+            cols["n"] = "trades"
+        df = df[list(cols.keys())]
+        df.rename(columns=cols, inplace=True)
         return df
     else:
         return pd.DataFrame()
@@ -73,12 +79,15 @@ def main():
     parser.add_argument(
         "--output", type=str, default="data", help="Output folder to store CSV files"
     )
-    # New arguments to optimize data retrieval for ML strategies
+    # New arguments to optimize data retrieval and ML analysis
     parser.add_argument(
         "--timespan", type=str, default="minute", help="Data timespan (e.g., minute, hour, day)"
     )
     parser.add_argument(
         "--multiplier", type=int, default=1, help="Multiplier for timespan aggregation"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=50000, help="Maximum records per request (default 50000)"
     )
     args = parser.parse_args()
 
@@ -87,7 +96,7 @@ def main():
 
     for ticker in args.tickers:
         print(f"Fetching data for {ticker}...")
-        df = fetch_stock_data(ticker, args.start, args.end, args.timespan, args.multiplier)
+        df = fetch_stock_data(ticker, args.start, args.end, args.timespan, args.multiplier, args.limit)
         if df.empty:
             print(f"No data returned for {ticker}.")
             continue
