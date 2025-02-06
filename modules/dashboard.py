@@ -71,17 +71,97 @@ def render_advanced_metrics(chosen_ticker, price_series, portfolio):
 
 def render_risk_metrics(portfolio, chosen_ticker):
     st.header("Risk Metrics")
-    risk_tabs = st.tabs(["Stats", "Drawdowns"])
+    risk_tabs = st.tabs(["Drawdowns", "Raw Statistics"])
     with risk_tabs[0]:
-        risk_stats = portfolio.stats()
-        st.table(risk_stats)
-    with risk_tabs[1]:
         st.write("Drawdown Plot:")
         fig = portfolio.drawdowns.plot(column=chosen_ticker)
         st.plotly_chart(fig)
+    with risk_tabs[1]:
+        risk_stats = portfolio.stats()
+        st.table(risk_stats)
 
-def render_ml_results(ml_model, rmse, y_test, y_pred):
-    st.header("ML Strategy Results")
+def render_ml_strategy(data, chosen_ticker):
+    from modules.ml_strategy import create_ml_dataset, split_dataset, train_and_predict, compute_rmse
+    st.header("ML Strategy")
+
+    row1col1, row1col2 = st.columns(2)
+    with row1col1:
+        ml_model = st.selectbox(
+            "Select ML Model",
+            options=["Linear Regression", "Random Forest", "XGBoost", "Neural Network"],
+            index=0
+        )
+    with row1col2:
+        feature_window = st.slider("Feature Window (days)", min_value=5, max_value=60, value=20)
+
+    row2col1, row2col2 = st.columns(2)
+    with row2col1:
+        train_split = st.slider("Training Split (%)", min_value=50, max_value=90, value=70)
+    with row2col2:
+        prediction_horizon = st.slider("Prediction Horizon (days)", min_value=1, max_value=30, value=5)
+
+    row3col1, row3col2 = st.columns(2)
+    with row3col1:
+        with st.expander("Model Options"):
+            st.html("""
+            <div style="font-size:13px;">
+                <span style="font-weight:600;color:#333;">Linear Regression:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Simple linear model that fits a line to the data.</li>
+                    <li>Interpretable but may underfit complex patterns.</li>
+                </ul>
+                
+                <span style="font-weight:600;color:#333;">Random Forest:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Ensemble model that averages multiple decision trees.</li>
+                    <li>Less interpretable but can capture complex patterns.</li>
+                </ul>
+                
+                <span style="font-weight:600;color:#333;">XGBoost:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Gradient boosting model that optimizes a set of decision trees.</li>
+                    <li>Highly accurate but may overfit with too many trees.</li>
+                </ul>
+                
+                <span style="font-weight:600;color:#333;">Neural Network:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Deep learning model with multiple layers of neurons.</li>
+                    <li>Highly flexible but requires large amounts of data and tuning.</li>
+                </ul>
+            </div>
+            """)
+    with row3col2:
+        with st.expander("Parameter Options"):
+            st.html("""
+            <div style="font-size:13px;">
+                <span style="font-weight:600;color:#333;">Feature Window:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Number of lagged features to create for the model.</li>
+                    <li>More features can capture more information but may lead to overfitting.</li>
+                </ul>
+                
+                <span style="font-weight:600;color:#333;">Prediction Horizon:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Number of days ahead to predict the target price.</li>
+                    <li>Shorter horizons may be more accurate but less profitable.</li>
+                </ul>
+                
+                <span style="font-weight:600;color:#333;">Training Split:</span><br/>
+                <ul style="font-size:13px;margin-left:16px;">
+                    <li>Percentage of data to use for training the model.</li>
+                    <li>More training data can improve model performance but may lead to overfitting.</li>
+                </ul>
+            </div>
+            """)
+
+    ml_series = data[chosen_ticker]
+    df_ml = create_ml_dataset(ml_series, feature_window, prediction_horizon)
+    X_train, y_train, X_test, y_test = split_dataset(df_ml, train_split)
+    y_pred, _ = train_and_predict(ml_model, X_train, y_train, X_test)
+    rmse = compute_rmse(y_test, y_pred)
+
+    # Display the results
+    st.subheader("Results")
     st.write("Selected Model:", ml_model)
     st.write(f"RMSE: {rmse:.2f}")
     fig = go.Figure()
