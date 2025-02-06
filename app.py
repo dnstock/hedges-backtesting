@@ -6,7 +6,7 @@ import vectorbt as vbt
 from modules.data_loader import load_ticker_data
 from modules.analytics import compute_moving_averages, generate_signals
 from modules.ml_strategy import create_ml_dataset, split_dataset, train_and_predict, compute_rmse
-from modules.dashboard import (render_portfolio_tab, render_price_chart,
+from modules.dashboard import (render_portfolio_tab, render_price_chart, render_risk_metrics,
                                render_advanced_metrics, render_ml_results)
 
 # Set page configuration for a wider layout and custom title
@@ -142,7 +142,7 @@ chosen_ticker = selected_tickers[0]
 price_series = data[chosen_ticker]
 
 # Create top-level tabs to streamline main area UX
-main_tabs = st.tabs(["Portfolio", "Price & Trends", "Advanced Metrics", "ML Strategy"])
+main_tabs = st.tabs(["Portfolio", "Price & Trends", "Advanced Metrics", "ML Strategy", "Risk Metrics"])
 
 with main_tabs[0]:
     # Portfolio section
@@ -164,3 +164,7 @@ with main_tabs[3]:
     y_pred, _ = train_and_predict(ml_model, X_train, y_train, X_test)
     rmse = compute_rmse(y_test, y_pred)
     render_ml_results(ml_model, rmse, y_test, y_pred)
+
+with main_tabs[4]:
+    # Risk Metrics section
+    render_risk_metrics(portfolio, chosen_ticker)

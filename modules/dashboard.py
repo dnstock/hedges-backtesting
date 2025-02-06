@@ -69,6 +69,17 @@ def render_advanced_metrics(chosen_ticker, price_series, portfolio):
             fig.update_layout(title=f"{chosen_ticker} Drawdowns", xaxis_title="Index", yaxis_title=drawdown_col.title())
             st.plotly_chart(fig)
 
+def render_risk_metrics(portfolio, chosen_ticker):
+    st.header("Risk Metrics")
+    risk_tabs = st.tabs(["Stats", "Drawdowns"])
+    with risk_tabs[0]:
+        risk_stats = portfolio.stats()
+        st.table(risk_stats)
+    with risk_tabs[1]:
+        st.write("Drawdown Plot:")
+        fig = portfolio.drawdowns.plot(column=chosen_ticker)
+        st.plotly_chart(fig)
+
 def render_ml_results(ml_model, rmse, y_test, y_pred):
     st.header("ML Strategy Results")
     st.write("Selected Model:", ml_model)
