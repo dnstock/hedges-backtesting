@@ -2,19 +2,26 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 
+def render_portfolio_tab(portfolio, data):
+    st.header("My Portfolio")
+    portfolio_tabs = st.tabs(["Value", "Performance", "Raw Data"])
+    with portfolio_tabs[0]:
+        render_value_tab(portfolio)
+    with portfolio_tabs[1]:
+        render_performance_tab(portfolio)
+    with portfolio_tabs[2]:
+        st.dataframe(data)
+
 def render_performance_tab(portfolio):
-    st.header("Portfolio Performance")
-    with st.expander("Show Metrics"):
-        stats_df = portfolio.stats()
-        if isinstance(stats_df, pd.Series):
-            stats_df = stats_df.to_frame().T
-        for col in stats_df.columns:
-            if pd.api.types.is_timedelta64_dtype(stats_df[col]):
-                stats_df[col] = stats_df[col].astype(str)
-        st.dataframe(stats_df)
+    stats_df = portfolio.stats()
+    if isinstance(stats_df, pd.Series):
+        stats_df = stats_df.to_frame().T
+    for col in stats_df.columns:
+        if pd.api.types.is_timedelta64_dtype(stats_df[col]):
+            stats_df[col] = stats_df[col].astype(str)
+    st.dataframe(stats_df)
 
 def render_value_tab(portfolio):
-    st.header("Portfolio Value")
     portfolio_value = portfolio.value() if callable(portfolio.value) else portfolio.value
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=portfolio_value.index, y=portfolio_value, mode="lines", name="Portfolio Value"))
